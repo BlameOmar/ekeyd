@@ -1,0 +1,17 @@
+Simtec Electronics, Entropy Key
+-------------------------------
+
+
+In producing the Entropy Key device, firmware and host-side software,
+various people have helped by beta-testing hardware and software, or
+by providing invaluable assistance in getting the host software
+working on any given operating system.  Simtec Electronics would
+therefore like to thank the following people for their aid.
+
+Bdale Garbee (Beta testing and stirring early interest)
+Elizabeth Garbee (Logo design)
+Jonathan Gray (OpenBSD assistance, OpenBSD ports updates)
+Lesley Mitchell (RPM packaging work)
+M Joonas Pihlaja (OpenBSD assistance)
+Daniel Stone (OpenBSD assistance)
+Nicholas Alcock (Lots optimisations and tidying)

@@ -1,0 +1,26 @@
+# Entropy key udev rules
+#
+# Centos 5.5 rules for udev version 095
+# 
+# These rules create devices under /dev/entropykey/<serialnumber>
+#
+# CAUTION: There are known issues with the kernel ttyACM driver (cdc_acm). 
+#          Hard crashes have been observed with some kernel versions.
+#          This ruleset has been tested on kernel version 2.6.18-238.9.1.el5
+#            which appears stable after several days testing.
+#
+# Copyright 2011 Simtec Electronics
+#
+# For licence terms refer to the COPYING file.
+
+# Detect an Entropy Key being inserted and add info values to environment
+ACTION=="add|change|remove", SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", BUS=="usb", SYSFS{idVendor}=="20df", SYSFS{idProduct}=="0001", IMPORT{program}="usb_id -nx %p"
+
+# Detect an Entropy Key being inserted and extract serial number
+ACTION=="add|change|remove", SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", BUS=="usb", SYSFS{idVendor}=="20df", SYSFS{idProduct}=="0001", IMPORT{program}="/lib/udev/entropykey_id.sh $env{ID_SERIAL}"
+
+# Add the /dev/entropykey/<serialnumber> symbolic link
+ENV{ENTROPY_KEY_SERIAL}!="", SYMLINK+="entropykey/$env{ENTROPY_KEY_SERIAL}"
+
+# And tell the ekeyd about the new device.
+ENV{ENTROPY_KEY_SERIAL}!="", RUN+="/lib/udev/entropykey.sh"

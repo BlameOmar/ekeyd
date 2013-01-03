@@ -1,0 +1,20 @@
+Entropy Key - List of authors
+=============================
+
+If you have any questions about the Entropy Key or this software then
+please contact ekey@simtec.co.uk directly.
+
+The Entropy Key host software was written by:
+
+  - Daniel Silverstone
+  - Vincent Sanders
+  - Rob Kendrick
+
+This software contains some code written by David Manura.
+
+Patches to support MirBSD and to better support OpenBSD provided by Thorsten
+Glaser.
+
+Significant patches to improve performance provided by Nicholas Alcock
+
+The implementation of Skein used in this software was written by Doug Whiting.

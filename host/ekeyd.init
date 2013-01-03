@@ -1,0 +1,60 @@
+#!/bin/sh -e
+
+### BEGIN INIT INFO
+# Provides:          ekeyd
+# Required-Start:    udev
+# Required-Stop:     
+# Default-Start:     S
+# Default-Stop:      
+# Short-Description: Entropy Key Manager
+### END INIT INFO
+
+PATH="/sbin:/bin:/usr/sbin:/usr/bin"
+DAEMON=/usr/sbin/ekeyd
+
+[ -x "$DAEMON" ] || exit 0
+
+. /lib/lsb/init-functions
+
+if [ -s /etc/default/ekeyd ]; then
+    . /etc/default/ekeyd
+else
+    log_failure_msg "Could not find /etc/default/ekeyd (aborting)"
+    exit 1
+fi
+if [ ! -s /etc/entropykey/ekeyd.conf ]; then
+    log_failure_msg "Could not find /etc/entropykey/entropykey.conf (aborting)"
+    exit 1
+fi
+
+if [ "x$START_EKEYD" != "xYES" ]; then
+    log_failure_msg "Simtec Entropy Key Daemon is disabled"
+    exit 1
+fi
+
+case "$1" in
+    start)
+	log_daemon_msg "Starting Simtec Entropy Key Daemon" "ekeyd"
+	start-stop-daemon --start --exec $DAEMON
+	log_end_msg 0
+	;;
+    restart|force-reload)
+	$0 stop
+	$0 start
+	;;
+    stop)
+	log_daemon_msg "Stopping Simtec Entropy Key Daemon" "ekeyd"
+	start-stop-daemon --stop --pidfile /var/run/ekeyd.pid --exec $DAEMON --oknodo --quiet
+	log_end_msg 0
+	;;
+    status)
+	exit 4
+	;;
+    *)
+	echo "Usage: /etc/init.d/ekeyd {start|stop}"
+	exit 2
+	;;
+	
+esac
+
+exit 0

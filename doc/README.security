@@ -1,0 +1,198 @@
+Entropy Key
+===========
+
+This document explains the process by which the Entropy Key gathers
+entropy and ensures that it is as close to one Shannon per bit as it
+can.  The document also covers the keys contained in the Entropy Key
+device, and how they are used to secure communication between the
+device and the host.
+
+How the Entropy Key gathers its data
+------------------------------------
+
+The Entropy Key uses P-N semiconductor junctions reverse biassed with
+a high enough voltage to bring them near to, but not beyond, breakdown
+in order to generate noise.  In other words, it has a pair of devices
+that are wired up in such a way that as a high potential is applied
+across them, where electrons do not normally flow in this direction
+and would be blocked, the high voltage compresses the semiconduction
+gap sufficiently that the occasional stray electron will quantum
+tunnel through the P-N junction. (This is sometimes referred to as
+avalanche noise.)  When this happens is unpredictable, and the
+occurrence of these events is what the Entropy Key measures.
+
+These noise generators are then coupled to a 72MHz ARM Cortex-M3 CPU on
+the device.  This processor samples the generators at a high frequency,
+forming a stream of random bytes.  These streams of bytes are then
+analysed using Üli Maurer's universal test for random bit generators
+whereby the amount of entropy in the streams is estimated rather
+conservatively.  The streams are also exclusive-ORed together and that
+stream's entropy is estimated in the same manner.  If the raw streams
+appear to have severely reduced entropy then it indicates a fault in
+that generator, if the third stream has low entropy then it indicates
+that the generators have correlated and are not independently
+gathering entropy.  Any of those three states are considered a failure
+mode and will result in the eKey locking itself out of the host,
+returning only an error code instead of generating entropy packets.
+
+The two raw streams are then processed further in a debiassing process
+invented by John von Neumann.  Their entropy is estimated after the
+debiassing process has been performed.  Again, if the estimated entropy
+in the streams is seen to vary too wildly at this stage, the Entropy
+Key will lock itself out.  The processed streams are then mixed into a
+pool made with a secure hashing function.  Once at least 50% more
+(estimated) entropy has been mixed into the pool than it could
+possibly hold it is finalised and another pool initialised.  Once
+enough pools have been processed to fill 20000 bits, the totality is
+subjected to the tests stipulated in FIPS 140-2.  These tests produce a
+PASS/FAIL indicator for the block.  On its own, this is not useful,
+since a perfectly random block could quite plausibly fail the
+tests.  The Entropy Key therefore keeps running statistics on the FIPS
+140-2 tests and will lock itself out if the ratio of failed blocks to
+passed blocks rises above a conservative estimate of the statistical
+likelyhood of failure.
+
+Once the block has been analysed, regardless of its PASS/FAIL
+indication, it is chopped up into 32 byte packets and these are handed
+off to the protocol handler in the device.  Through this process
+therefore, each 256 bit block of data handed to the host was formed
+from somewhere in the region of between 3000 and 5000 bits read from
+the generators.
+
+
+How the communication between the device and host is secured
+------------------------------------------------------------
+
+While the host communicates to the device via a severely reduced
+streaming protocol, the device communicates to the host in quite
+sophisticated packets of data in a byte stream.   For more information
+about the minutae of the protocol, please see README.protocol.
+
+When talking about the security measures of the Entropy Key device, we
+need to consider that a running device is aware of three symmetric
+cryptography keys.  These keys form a heirarchy descending from the
+Master Key which comes printed on a piece of card in a security
+envelope.
+
+  Key name      | Creation         | Used for
+ ---------------+------------------+---------------------------------------
+  Master Key    | Manufacture time | Creating Long-Term keys
+  Long-Term Key | ekey-rekey tool  | Creating session keys
+  Session Key   | ekeyd            | Securing communications from device.
+
+The Master Key (MK) is created when the device is manufactured and
+cannot be changed.  The only copy of the Master Key is on the card
+which comes with the Entropy Key device.  The manufacturer does not
+keep a copy of this key; it is printed out as the key is generated, and
+then forgotten.
+
+The Long-Term Key (LTK) can be changed by using the ekey-rekey (or
+ekey-setkey) tools provided as part of the host software.  These tools
+allow you to change the Long-Term key whenever you wish, although you
+need to have the Master Key to hand in order to do this.
+
+A new Session Key (SK) is created regularly (approximately once every
+45-60s) and is used to secure the communications from the device to
+the host as explained below.
+
+Each packet from the device to the host is authenticated with a MAC.
+This is a 48 bit value calculated by hashing the content of the packet
+along with the current session key, the serial number of the device
+and a Skein personalisation string for this purpose.  This allows the
+device to trust that packets coming from the device are valid and have
+not been tampered with, nor accidentally corrupted by the host.
+
+In order to create a new SK, the host must know the LTK and perform
+the following re-keying process:
+
+  1. The host creates a nonce of between zero and 4095 bytes.
+     Typically this will be around 12 byte and will contain a
+     monotonic counter as well as some amount of random data derived
+     from a random pool.
+
+  2. The host PEM encodes the nonce and sends to the device a packet
+     consisting of a 'K', the PEM encoded nonce, and a '.'
+
+  3. The device responds with a K! packet containing 32 bytes of
+     entropy gathered and mixed in the same way as entropy which would
+     normally be passed to the host.
+
+  4. The host verifies that K! packet states the number of bytes which
+     it believes it sent as the nonce.
+
+  5. Both host and device, independently, hash together the serial
+     number of the key, the host's nonce, the device's nonce, the LK
+     and a Skein personalisation string for this purpose.  The
+     finalised hash value is then used as the SK going forward.
+
+Typically, assuming the Entropy Key has not detected an attack or
+failure mode, the device will then start sending E! (entropy) packets
+to the host as detailed below.
+
+When the host wishes to create a new LK, the process is as above
+except that in addition, the steps below happen:
+
+1.1. The host hashes the nonce it has created, with the MK and a Skein
+     personalisation for this purpose.
+
+1.2. The host PEM encodes the first 24 and last 24 bits of this hash
+     and sends to the device a packet consisting of 'M' and the eight
+     characters of PEM encoded hash.
+
+1.3 The device responds with an M> packet indicating that LK rekeying
+    is now permitted.
+
+In step 2, the host sends an 'L' instead of a 'K' to indicate it
+wishes to rekey the LK.
+
+In steps 3 and 4, the packet from the device is an L! instead of a K!.
+
+However, there is also:
+
+2.5. The device hashes the nonce sent by the host in the same way as
+     the host did in 1.1.  If the hash does not match that sent by the
+     host in 1.2 then the device responds with an 'l>' packet to
+     indicate failure.
+
+In step 5, the personalisation used is one specific to the process of
+LK rekeying and once the new LK has been calculated, the device
+commits it to non-volatile storage inside the CPU.
+
+
+How Entropy Packets are secured
+-------------------------------
+
+Each E! packet carries a sequence number in its extra-information
+field.  That sequence number, along with the session key, the serial
+number of the device and a Skein personalisation string for this
+purpose are hashed together to form a 256 bit one-time-pad.
+
+The entropy to be sent from device to host is then exclusive-ored
+(XOR) with this one-time-pad before being PEM encoded and sent as a
+packet.  Once the sequence number reaches 4095 the device stops
+sending E!  packets until a new SK is negotiated.
+
+
+Frequency of packets
+--------------------
+
+The most common packet sent by the device is the E! packet.  Each time
+a 20000 bit state is completed, (and the device has an SK which hasn't
+expired) 78 E! packets will be queued for transmission.  This happens
+slightly more often than once per second, which leads to approximately
+86 E! packets per second.  Each one carries a 12 bit sequence number
+and a 48 bit MAC.  This leads us to assume that once every 2^59
+packets one will have gathered enough data to perform an attack by
+substituting an E! packet for one which has gone before, which matches
+MAC and sequence number.  This is therefore roughly every 212000
+millennia.  Fortunately even were the sequence number and MAC to
+collide with a packet already seen, the session key is exceedingly
+unlikely to actually be the same.  As such, despite being able to
+substitute an E! packet into the stream, the entropy which is
+decrypted will not be predictable by the attacker.
+
+The greatest frequency by which rekeying events can be forced and thus
+potentially leak information about the keys in the device is limited
+directly by how fast the device can gather entropy.  Therefore devices
+are hard-limited to approximately 86 rekeyings per second.
+

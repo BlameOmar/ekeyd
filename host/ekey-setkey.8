@@ -1,0 +1,47 @@
+.TH ekey-setkey 8 "19th July 2009"
+.SH NAME
+ekey-setkey - Entropy Key Long Term Key programmer
+.SH SYNOPSIS
+.B ekey-setkey
+.RB [ \-s
+.IR SerialNumber ]
+.RB [ \-m
+.IR MasterKey ]
+path
+.SH DESCRIPTION
+.PP
+.I ekey-setkey
+is a low level tool which sets the long-term key of an Entropy Key using its Master Key. The keyring is updated with the new session key. Any running ekeyd will not be updated with the new key and may interfere with the re-keying process.  Users may use the ekey-rekey tool instead as this performs the relevant ekeydctl operations to ensure any running ekeyd is updated apropriately.
+.SH "OPTIONS"
+.TP
+.B \-s
+Specifies the serial number of the key to re-key.
+.TP
+.B \-m
+Specifies the Master Key of the device
+.TP
+.B path
+Specifies which device node to use to access the Entropy Key.
+.SH "SEE ALSO"
+ekey-rekey(8), ekeyd(8)
+.SH AUTHOR
+Copyright \(co 2009 Simtec Electronics.
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy 
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights 
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+copies of the Software, and to permit persons to whom the Software is 
+furnished to do so, subject to the following conditions: 
+ 
+The above copyright notice and this permission notice shall be included in 
+all copies or substantial portions of the Software. 
+ 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+THE SOFTWARE. 

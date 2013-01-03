@@ -1,0 +1,3 @@
+[ekeyd_stat_*]
+user root
+env.controlsocket /var/run/ekeyd.sock

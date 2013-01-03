@@ -1,0 +1,50 @@
+Entropy Key - EGD Protocol
+==========================
+
+The EGD (Entropy Gathering Daemon) program defined a simple byte-based
+protocol for retrieving entropy from a daemon.  The protocol is run
+over stream sockets, either UNIX domain sockets, or TCP sockets.  The
+Entropy Key software can provide sockets which act in the same way in
+order to allow software compatible with EGD to retrieve high quality
+entropy from the Entropy Keys.
+
+The protocol is a byte-based command/response protocol which is always
+initiated by the client.  Where values longer than one byte are used,
+they are in network-byte-order.  i.e. U32 is an unsigned four byte
+number, big-endian.
+
+Command: 0x00  -  Read entropy pool size
+  Arguments: None
+  Response:  U32 (Available entropy in bits)
+
+Command: 0x01  -  Retrieve entropy (non-blocking)
+  Arguments: U8 (Number of bytes of entropy desired)
+  Response: U8 (Number of bytes of entropy returned)
+            STR (The bytes of entropy)
+
+Command: 0x02  -  Retrieve entropy (blocking)
+  Arguments: U8 (Number of bytes of entropy desired)
+  Reponse: STR (The bytes of entropy)
+
+  This command will block until sufficient entropy is available to
+  satisfy the request.  The entropy will be streamed to the client as
+  and when it becomes available.  The ekeyd will make some attempt to
+  spread the available entropy around between clients which are
+  blocked, however a blocking client can starve a non-blocking client
+  of entropy.
+
+Command: 0x03  -  Add entropy to pool
+  Arguments: U16 (Number of shannons of entropy)
+             U8  (Number of bytes containing that)
+             STR (The bytes of entropy)
+  Response: None
+
+  This command is parsed by ekeyd but ignored.
+
+Command: 0x04  -  Get PID of EGD
+  Arguments: None
+  Response:  U8  (Number of bytes in PID string)
+             STR (PID string)
+
+  This command is parsed by ekeyd but will always
+  return PID -1.

@@ -1,0 +1,242 @@
+#!/usr/bin/env lua@LUA_V@
+-- -*- Lua -*-
+
+require "socket"
+
+-- Try to load the UNIX domain sockets support
+pcall(function()
+	 require "socket.unix"
+      end)
+
+
+function usage()
+   io.stderr:write((([[
+%1%: Control the entropy daemon.
+Usage: %1% <command> [args...]
+
+Where command is one of:
+    add		Add an entropy key (dev node provided as argument).
+    addall      Add a directory full of keys (dir name provided as argument).
+    remove	Remove an entropy key (One of dev node, serial, ID as argument).
+    list	List all the entropy keys attached to the daemon.
+    stats	Show the statistics for an entropy key (One of dev node, 
+                  serial, ID as argument).
+    keyring	Load a keyring (keyring filename provided as argument)
+    shutdown	Shut the entropy key daemon down.
+]]):gsub("%%(%d+)%%", function(n) return ({arg[0]})[tonumber(n)] end)))
+end
+
+-- Utility functions
+
+do
+   local strfind = string.find
+   local strlen = string.len
+   local tinsert = table.insert
+   local strsub = string.sub
+
+function split(s, b, c)
+--[[
+   Return the elements of a delimited string.
+
+   Split string \s on boundary \b and return the list of components.
+
+   @param s(string) The string to split up
+   @param b(string) The boundary to split on
+   @param c(boolean) Correctness. If true, splitting '' returns {''}
+   @return bits(table) The bits of \s split up on \b
+]]
+   local t = {}
+   b = b or " "
+   local p = strfind(s, b, 1, 1)
+   local l = strlen(b)
+   
+   if (not p) then
+      if( s ~= "" or c ) then
+         return { s }
+      else
+         return {}
+      end
+   end
+   
+   while strlen(s) ~= 0 do
+      p = strfind(s, b, 1, 1)
+      if (p) then
+         tinsert(t, strsub(s, 1, p - 1))
+         s = strsub(s, p + l, -1)
+      else
+         tinsert(t, s)
+         s = ""
+      end
+   end
+   
+   return t
+end
+end
+
+
+-- Connectivity
+
+local __tcpcontrolport, __unixcontrolpath = nil, nil
+local __socket
+
+function wait_for(pattern)
+   -- Read lines from the socket (max 3s pause) until we hit pattern.
+   -- Return a table of all the lines, incl. the one which matches.
+   -- On timeout, simply report the error and exit.
+   local rett = {}
+   local lastline
+   repeat
+      lastline = assert(__socket:receive())
+      rett[#rett + 1] = lastline
+      if string.match(lastline, "^ERROR") then
+	 io.stderr:write(lastline .. "\n")
+	 os.exit(4)
+      end
+   until string.match(lastline, pattern)
+   return rett
+end
+
+function connect_to_daemon()
+   if __unixcontrolpath then
+      __socket = socket.unix()
+      local result, msg = __socket:connect(__unixcontrolpath)
+      if not result then
+	 error("Unable to connect to ekeyd at " .. __unixcontrolpath .. " (" .. msg .. ") Is ekeyd running?")
+      end
+   elseif __tcpcontrolport then
+      __socket = socket.tcp()
+      local result, msg = __socket:connect("127.0.0.1", tonumber(__tcpcontrolport))
+      if not result then
+	 error("Unable to connect to ekeyd at 127.0.0.1:" .. tostring(__tcpcontrolport) .. " (" .. msg .. ") Is ekeyd running?")
+      end
+   else
+      io.stderr:write("Unable to find control socket\n")
+      os.exit(3)
+   end
+   __socket:settimeout(3)
+   wait_for("PROTOCOL EKEYD/%d+")
+end
+
+function expectarg(argno, val, msg)
+   if val ~= nil then
+      return
+   end
+   io.stderr:write("Expected argument " .. tostring(argno) .. " missing: " .. msg .. "\n")
+   os.exit(6)
+end
+
+-- Commands
+
+function command_list()
+   __socket:send("ListEntropyKeys\n")
+   local res = wait_for("^OK$")
+   local splits = {}
+   for _, s in ipairs(res) do
+      splits[#splits+1] = split(s, "\t")
+      table.remove(splits[#splits], 1)
+   end
+   headers = table.remove(splits, 1)
+   table.remove(splits, table.getn(splits))
+   print(table.concat(headers, ","))
+   for _, ktab in ipairs(splits) do
+      print(table.concat(ktab, ","))
+   end
+end
+
+function command_stats(node)
+   expectarg(1, node, "Entropy Key Identifier")
+   __socket:send("StatEntropyKey(" .. string.format("%q", node) .. ")\n")
+   local res = wait_for("^OK$")
+   res[#res] = nil
+   table.sort(res)
+   for i, v in ipairs(res) do
+      v = split(v, "\t")[2]
+      print(v)
+   end
+end
+
+function command_add(node, optserial)
+   expectarg(1, node, "Path to Entropy Key")
+   if optseral == nil then
+      optserial = "nil"
+   else
+      optserial=string.format("%q", optserial)
+   end
+   __socket:send("AddEntropyKey(" .. string.format("%q", node) .. "," .. optserial .. ")\n")
+   wait_for("^OK")
+end
+
+function command_remove(node)
+   expectarg(1, node, "Entropy Key Identifier")
+   __socket:send("RemoveEntropyKey(" .. string.format("%q", node) .. ")\n")
+   wait_for("^OK")
+end
+
+function command_addall(dir)
+   expectarg(1, dir, "Path to directory of Entropy Keys")
+   __socket:send("AddEntropyKeys(" .. string.format("%q", dir) .. ")\n")
+   wait_for("^OK")
+end
+
+function command_keyring(keyring)
+   expectarg(1, keyring, "Path to keyring file to load")
+   __socket:send("Keyring(" .. string.format("%q", keyring) .. ")\n")
+   wait_for("^OK")
+end
+
+function command_shutdown()
+   __socket:send("Shutdown\n")
+end
+
+if #arg < 1 then
+   usage()
+   os.exit(1)
+end
+
+command = arg[1]
+
+cmd = _G["command_" .. command]
+
+cmdargs = {}
+k = 2
+while arg[k] do
+   cmdargs[k - 1] = arg[k]
+   k = k + 1
+end
+
+if (cmd == nil) then
+   io.stderr:write("Unknown command: " .. command .. "\n")
+   usage()
+   os.exit(2)
+end
+
+-- These functions are to emulate the config file of ekeyd
+function SetOutputToKernel() end
+function AddEntropyKeys() end
+function AddEntropyKey() end
+function Keyring() end
+function SetOutputToFile() end
+function TCPControlSocket(port)
+   __tcpcontrolport = port
+end
+function UnixControlSocket(path)
+   __unixcontrolpath = path
+end
+function EGDUnixSocket() end
+function EGDTCPSocket() end
+function Daemonise() end
+
+assert(loadfile"@SYSCONFPREFIX@/ekeyd.conf")()
+
+function do_it()
+   connect_to_daemon()
+   os.exit(cmd(unpack(cmdargs)) or 0)
+end
+
+_, msg = xpcall(do_it, function(s) return s end)
+
+-- If we reach here, do_it had an error.
+
+io.stderr:write("Internal error: " .. msg .. "\n")
+
+os.exit(5)

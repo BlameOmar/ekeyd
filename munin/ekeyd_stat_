@@ -1,0 +1,223 @@
+#!/usr/bin/perl -w
+#
+# Entropy Key statistic reporting plugin for munin
+#
+# use by soft linking the script to a ekey statistic
+# for example ln -s /usr/share/munin/ekeyd_stat_ ekeyd_stat_KeyTemperatureC
+# will give a graph of each entropy keys temperature in Celsius
+#
+# for example ln -s /usr/share/munin/ekeyd_stat_ ekeyd_stat_total_EntropyRate
+# will give a graph of the total entropy rate from all keys in bits per second
+#
+# The plugin.conf.d/munin-node must have a stanza [ekeyd_*] with user root in 
+#  it as the plugin requires root access to aquire the statistics
+#
+# Copyright 2009 Simtec Electronics
+#
+# For licence terms refer to the COPYING file.
+
+# Magic markers for munin
+#%# family=auto
+#%# capabilities=autoconf suggest
+
+use strict;
+
+use Socket;
+use IO::Handle;
+
+my $control_sock = exists $ENV{controlsocket} ? $ENV{controlsocket} : '/var/run/ekeyd.sock';
+
+# mappings to make output prettier
+my %titles = ("KeyTemperatureC", "Temperature" ,"KeyTemperatureF", "Temperature", "KeyTemperatureK" ,  "Temperature" , "TotalEntropy",  "Entropy Rate", "KeyVoltage", "Supply Voltage", "FipsFrameRate", "Fips Frame Rate", "EntropyRate", "Entropy Rate");
+my %graph_axis = ( "KeyTemperatureC", "Celsius", "KeyTemperatureF", "Fahrenheit", "KeyTemperatureK", "Kelvin" , "EntropyRate", "Bits per second" , "TotalEntropy", "Bytes per second" , "KeyVoltage", "Volts", "ConnectionTime", "Seconds", "FipsFrameRate", "Frames per second");
+my %graph_type = ( "TotalEntropy" , "DERIVE", "BytesRead" , "COUNTER", "BytesWritten" , "COUNTER", "ConnectionPackets" , "COUNTER" );
+my %graph_min = ( "TotalEntropy" , 0 );
+
+sub ekeyd_connect {
+    my ($rendezvous) = @_;
+    my $line;
+    my $sock;
+
+    socket($sock, PF_UNIX, SOCK_STREAM, 0) || die "socket: $!";
+    connect($sock, sockaddr_un($rendezvous)) || die "connect: $!";
+
+    $line = <$sock>;
+    if ((!defined($line)) || ($line ne "PROTOCOL EKEYD/1\n")) {
+	die "Unrecognised EKEYD " . $line;
+    }
+
+    return $sock;
+}
+
+# issues a command to the ekeyd and retrieves the results
+sub ekeyd_command {
+    my ($sock, $command, @params) = @_;
+    my @lines;
+    my $line;
+    my $pnum = scalar @params;
+
+    if ($pnum > 0) {
+	my $pcnt = 0;
+	$command .= "(";
+	while ($pcnt < $pnum) {
+	    $command = $command . "\"" . $params[$pcnt] . "\"";
+	    $pcnt++;
+	    if ($pcnt == $pnum) {
+		$command .= ")";
+	    } else {
+		$command .= ",";
+	    }
+	}
+    }
+
+    print $sock $command . "\n";
+    $sock->flush;
+
+    push @lines, $line while ((defined($line = <$sock>)) and $line ne "OK\n" and $line !~ "^ERROR.*");
+
+    chomp @lines;
+
+    return @lines;
+}
+
+# discover if plugin can actually be used on this system
+if ( defined $ARGV[0] and $ARGV[0] eq "autoconf" ) {
+    if ($control_sock and -S $control_sock) {
+        print "yes\n";
+	exit 0;
+    } else {
+	print "no (Control socket $control_sock not found)\n";
+	exit 1;
+    }
+}
+
+# suggest appropriate default links
+if ( defined $ARGV[0] and $ARGV[0] eq "suggest" ) {
+    print "total_TotalEntropy\n";
+    print "KeyTemperatureC\n";
+    exit 0;
+}
+
+# aquire the name of the statistic to monitor.
+$0 =~ /ekeyd_stat_total_(.+)*$/; 
+my $statistic = $1;
+my $total_flag = 1;
+if (!defined($statistic)) {
+    $0 =~ /ekeyd_stat_(.+)*$/; 
+    $statistic = $1;
+    $total_flag = 0;
+    if (!defined($statistic)) {
+	die "A statistic must be provided";
+    }
+}
+
+# connect to the ekeyd command socket
+my $SOCKET = ekeyd_connect($control_sock);
+
+# find all the entropy keys attached
+my @result = ekeyd_command($SOCKET, "ListEntropyKeys");
+
+# remove header line
+shift @result; 
+
+if ( defined $ARGV[0] and $ARGV[0] eq "config" ) {
+
+    # work out graph title
+    my $title;
+    if (defined $titles{$statistic}) {
+	$title = $titles{$statistic};
+    } else {
+	$title = $statistic;
+    }
+
+    if ($total_flag == 1) {
+	if (scalar(@result) < 2) {
+            print "graph_title Entropy Key " . $title . "\n";
+	} else {
+            print "graph_title Entropy Key Combined " . $title . "\n";
+	}
+    } else {
+        print "graph_title Entropy Key " . $title . "\n";
+    }
+
+    # label the axis as apropriate
+    if (defined $graph_axis{$statistic}) {
+	print "graph_vlabel " . $graph_axis{$statistic} . "\n";
+    }
+ 
+    print "graph_category sensors\n";
+
+    if ($total_flag == 1) {
+	if (scalar(@result) < 2) {
+	    print "totstat.label $title\n";
+	} else {
+	    print "totstat.label Combined $title for " . scalar(@result) . " Entropy Keys\n";
+	}
+
+	# set the graph type
+	if (defined $graph_type{$statistic}) {
+	    print "totstat.type " . $graph_type{$statistic} . "\n";
+	} else {
+	    print "totstat.type GAUGE\n";
+	}
+
+	#set the graph minimum
+	if (defined $graph_min{$statistic}) {
+            print "totstat.min " . $graph_min{$statistic} . "\n";
+	}
+    } else {
+	# details for each key 
+	foreach my $keyline (@result) {
+	    my @elmnt = split(/\t/, $keyline);
+	    my $name = $elmnt[5];
+	    $name =~ s,/,_,g;
+	    print "stats" . $name . ".label " . $elmnt[5] . "\n";
+
+	    # set the graph type
+	    if (defined $graph_type{$statistic}) {
+		print "stats" . $name . ".type " . $graph_type{$statistic} . "\n";
+	    } else {
+		print "stats" . $name . ".type GAUGE\n";
+	    }
+
+	    #set the graph minimum
+	    if (defined $graph_min{$statistic}) {
+                print "stats". $elmnt[5] . ".min " . $graph_min{$statistic} . "\n";
+	    }
+	}
+    }
+} else {
+    my $total = 0;
+    foreach my $keyline (@result) {
+
+	# split up the result line
+	my @elmnt = split(/\t/, $keyline);
+
+	# get the status of the entropy key 
+	my @stat_res = ekeyd_command($SOCKET, "StatEntropyKey", $elmnt[5]);
+
+	my $tmp;
+	my %key_stats;
+
+	foreach $tmp (@stat_res) {
+	    my @keyval = split(/\t/, $tmp);
+	    @keyval = split(/=/, $keyval[1]);
+	    $key_stats{$keyval[0]} = $keyval[1];
+	}
+	$total += $key_stats{$statistic};
+
+	if ($total_flag == 0) {
+	    print "stats" . $elmnt[5] . ".value " . $key_stats{$statistic} . "\n";
+	}
+    }
+    if ($total_flag == 1) {
+	if (scalar(@result) < 1) {
+	    $total = "U";
+	}
+	print "totstat.value " . $total . "\n";
+    }
+}
+
+close $SOCKET;
+
+exit 0;  

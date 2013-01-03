@@ -1,0 +1,157 @@
+.TH ekeydctl 8 "19th July 2009"
+.SH NAME
+ekeydctl - Entropy Key Daemon Control tool
+.SH SYNOPSIS
+.B ekeydctl
+.RB add 
+.IR DeviceNode 
+.RB | addall
+.IR KeyDirPath 
+.RB | list
+.RB | remove
+.IR Identifier
+.RB | stats 
+.IR Identifier
+.RB | keyring 
+.IR KeyRingFile
+.RB | shutdown
+.SH DESCRIPTION
+.PP
+.I ekeydctl
+is a tool which interacts with the ekeyd using a local unix domain socket. 
+.SH "OPTIONS"
+.TP
+.B add \fIDeviceNode
+Add an Entropy Key to be managed by the ekeyd daemon. The argument is the 
+device node of the key e.g. /dev/entropykey/AAAAAAAAAAAAAAAAAAA  
+.TP
+.B addall \fIDevicePath
+Add a number of Entopy Keys to be managed by the ekeyd daemon. The argument is the path to a directory containing the device nodes to be added e.g. /dev/entropykey
+.TP
+.B list
+List all the entropy keys attached to the ekeyd daemon.
+.TP
+.B remove \fIIdentifier
+Remove an Entropy Key from management by the ekeyd daemon. The argument may be the device node, the serial number of the key or the numeric ID as shown in the list command.
+.TP
+.B stats \fIIdentifier
+Show statistics for an Entropy Key. The argument may be the device node, the serial number of the key or the numeric ID as shown in the list command.
+.TP
+.B keyring \fIKeyring
+Re-load keyring entries from a keyring file. The argument is to a keyring file. Any existing connections will not be affected. 
+.TP
+.B shutdown
+Shut the entropy key daemon down.
+.SH "STATISTIC VARIABLES"
+The stats command produces a list of key and value pairs. Each variable gives some information about the selected Entropy Key.
+.TP
+.B BytesRead
+The total number of bytes read from the Entropy Key device.
+.TP
+.B BytesWritten
+The total number of bytes written to the Entropy Key device.
+.TP
+.B ConnectionNonces
+The number of session key nonces issued by the host software.
+.TP
+.B ConnectionPackets
+The number of packets recived from the Entropy Key device.
+.TP
+.B ConnectionRekeys
+The number of session re-keying events.
+.TP
+.B ConnectionResets
+The number of times the Entropy Key device has been reset by the host software.
+.TP
+.B ConnectionTime
+The number of seconds the Entropy Key device has been connected to the host software. 
+.TP
+.B EntropyRate
+The number of bits per second of entropy from the Entropy Key.
+.TP
+.B FipsFrameRate
+The number of FIPS frames generated per second by the Entropy Key.
+.TP
+.B FrameByteLast
+The byte offset of the last valid frame.
+.TP
+.B FramesOk
+The number of valid frames recived from the Entropy Key.
+.TP
+.B FramingErrors
+The number of framing errors.
+.TP
+.B KeyDbsdShannonPerByteL
+The estimated number of shannons per byte from the left generator after debiasing. 
+.TP
+.B KeyDbsdShannonPerByteR
+The estimated number of shannons per byte from the right generator after debiasing. 
+.TP
+.B KeyEnglishBadness
+Human-readable explanation of any 'badness' state on the device.
+.TP
+.B KeyRawBadness
+The raw badness token (if any) from the device.
+.TP
+.B KeyRawShannonPerByteL
+The estimated number of shannons per byte from the left generator before debiasing. 
+.TP
+.B KeyRawShannonPerByteR
+The estimated number of shannons per byte from the right generator before debiasing. 
+.TP
+.B KeyRawShannonPerByteX
+The estimated number of shannons per byte from the exclusive orred output of the generators before debiasing. 
+.TP
+.B KeyShortBadness
+Machine-readable reason for any 'badness' state on the device.
+.TP
+.B KeyTemperatureC
+The internal temperature in Celsius of the Entropy Key.
+.TP
+.B KeyTemperatureF
+The internal temperature in Fahrenheit of the Entropy Key.
+.TP
+.B KeyTemperatureK
+The internal temperature in Kelvin of the Entropy Key.
+.TP
+.B KeyVoltage
+The internal supply voltage of the Entropy Key.
+.TP
+.B PacketErrors
+The number of packet level errors.
+.TP
+.B PacketOK
+The number of correct packets.
+.TP
+.B ReadRate
+The number of bits per second being read from the Entropy Key.
+.TP
+.B TotalEntropy
+The total number of bytes read from the Entropy Key.
+.TP
+.B WriteRate
+The number of bits per second being written to the Entropy Key.
+ 
+.SH "SEE ALSO"
+ekeyd(8)
+.SH AUTHOR
+Copyright \(co 2009 Simtec Electronics.
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy 
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights 
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+copies of the Software, and to permit persons to whom the Software is 
+furnished to do so, subject to the following conditions: 
+ 
+The above copyright notice and this permission notice shall be included in 
+all copies or substantial portions of the Software. 
+ 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+THE SOFTWARE. 

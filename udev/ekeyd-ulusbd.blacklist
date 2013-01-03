@@ -1,0 +1,3 @@
+# The CDC ACM driver on this OS is buggy and can cause system crashes.
+
+blacklist cdc_acm

@@ -1,0 +1,121 @@
+Entropy Key - Quick Start
+=========================
+
+For more specific information, please see:
+
+  README.protocol - Information regarding the Entropy Key protocol
+  README.security - Information regarding security and the Entropy Key
+  README.egd-linux - Information regarding the ekey-egd-linux tool
+  README.egd-protocol - Information regarding the EGD protocol
+
+Quick Start
+-----------
+
+ 1) Install the package.
+
+      This will provide the ekeyd daemon, the ekey-rekey tool and
+      the ekeydctl tool.  By default, the daemon will not start
+      immediately.
+
+ 2) Plug the Entropy Key into a spare USB port.
+
+      Assuming the operating system has appropriate device drivers for
+      standard CDC serial ports, a device node for the character device
+      should be available.
+
+      On Linux systems where the appropriate udev rules have been
+      installed, a symbolic link to the device in /dev/entropykey/ will
+      be created.  The key will automatically be added to the running
+      daemon.
+
+ 3) Use the ekey-rekey tool to generate a new long term key. 
+
+      The device's USB serial number and master key are required to
+      perform this operation.  The resulting long term key is stored in
+      the daemon's keyring file and should only be accessible by
+      trusted users.  The serial number and new long-term-key are also
+      printed to the console as an indication that the keying process
+      was completed succesfully.
+
+      The device's USB serial number is printed on a label attached to
+      the documentation for your Entropy Key and is also available as
+      the USB device serial number in tools such as lsusb.
+
+      The master key is also obtained from the accompanying printed
+      material.  The master key is irreplaceable and if lost the device
+      can never be re-keyed again.
+
+      ********************************************************
+      * Please ensure the master key is kept somewhere safe! *
+      * The manufacturer does not keep duplicate information *
+      ********************************************************
+
+ 4) The /etc/entropykey/ekeyd.conf configuration file may be edited.
+
+      A system administrator may have specific requirements, any
+      alterable parameters can be set in the daemon configuration file.
+
+ 5) The ekeyd daemon should be started.
+
+      The daemon will communicate with the Entropy Key and output the
+      decrypted entropy using the configured output method.
+
+ 6) The status of the Entropy Key may be checked.
+
+      The ekeydctl program may be used, with the 'list' command , to
+      verify the new key is operating correctly and is properly
+      configured.  A correctly operating Entropy Key will be listed as
+      'Running OK'.  You can also use the 'stats' command along with
+      a device index or serial number to get detailed statistics for
+      a specific device.
+
+
+Overview
+--------
+
+The Entropy Key is a hardware random number generator.  Two independent
+streams of noise are processed within the USB device to produce a stream
+of strongly random 32-byte blocks.
+
+The USB device continuously verifies each part of this process to
+ensure the hardware is performing correctly and will immediately cease
+output of entropy should a fault condition be detected.
+
+The entropy is then encrypted with a 256 bit session key negotiated
+with the host daemon to ensure any third party monitoring the exchange
+between the device and the host will be unable to know or alter the
+random data retrieved from the device.
+
+The ekeyd daemon communicates with the USB device, decrypts the
+stream, and writes the random data to the configured output stream.
+
+The ekeyd daemon can be queried and controlled using commands on a
+control socket. There may be more than one control socket at a time
+and they may be either TCP or on-local-filesystem UNIX domain sockets.
+
+
+Contact Details
+---------------
+
+Email:
+ For general queries - ekey@simtec.co.uk
+ For product support - support@simtec.co.uk
+
+Website:
+ Entropy Key site - http://www.entropykey.co.uk/
+ Simtec Electronics site - http://www.simtec.co.uk/
+
+Telephone:
+ For sales: +44 (0)1772 978010
+
+Mail:
+ Simtec Electronics,
+ Avondale Drive,
+ Tarleton,
+ Preston,
+ Lancs
+
+ PR4 6AX
+
+ United Kingdom
+

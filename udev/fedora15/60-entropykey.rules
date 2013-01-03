@@ -1,0 +1,21 @@
+# Entropy key udev rules
+#
+# Centos/RHEL 6 rules for udev version 147
+# 
+# These rules create devices under /dev/entropykey/<serialnumber>
+#
+# Copyright 2011 Simtec Electronics
+#
+# For licence terms refer to the COPYING file distributed with the source.
+
+# Detect an Entropy Key being inserted and add info values to environment
+ACTION=="add|change|remove", SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", BUS=="usb", ATTRS{idVendor}=="20df", ATTRS{idProduct}=="0001", IMPORT{program}="usb_id --export %p"
+
+# Detect an Entropy Key being inserted and extract serial number
+ACTION=="add|change|remove", SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="20df", ATTRS{idProduct}=="0001", IMPORT{program}="/bin/echo ENTROPY_KEY_SERIAL=$env{ID_SERIAL_SHORT}"
+
+# Add the /dev/entropykey/<serialnumber> symbolic link
+ENV{ENTROPY_KEY_SERIAL}!="", SYMLINK+="entropykey/$env{ENTROPY_KEY_SERIAL}"
+
+# And tell the ekeyd about the new device.
+ENV{ENTROPY_KEY_SERIAL}!="", RUN+="/lib/udev/entropykey.sh"

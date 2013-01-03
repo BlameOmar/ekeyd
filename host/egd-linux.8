@@ -1,0 +1,65 @@
+.TH ekey-egd-linux 8 "19th July 2009"
+.SH NAME
+egd-linux - EGD Entropy Daemon
+.SH SYNOPSIS
+.B ekey-egd-linux
+[ \-H \fIhostip\fR ]
+[ \-p \fIportno\fR ]
+[ \-b \fIblocks\fR ]
+[ \-s \fIshannons\fR ]
+[ \-D \fIpidfile\fR ]
+[ \-r \fItime\fR ]
+[ \-v ]
+[ \-h ]
+.SH DESCRIPTION
+.PP
+.I ekey-egd-linux
+is a daemon which connects to an EGD server and places the read entropy in the kernels pool.
+.SH OPTIONS
+.TP
+.B \-H \fIhostip\fR
+Set the host IP address to connect to.
+.TP
+.B \-p \fIportno\fR
+Set the port number to connect to.
+.TP
+.B \-b \fIblocks\fR
+Set the number of 1024 bit blocks to request each time.
+.TP
+.B \-s \fIshannons\fR
+Set the number of shannons per byte.
+.TP
+.B \-D \fIpidfile\fR
+Specify the name and path of the file used to record the \fBekey-egd-linux\fR process ID.
+.TP
+.B \-r \fItime\fR
+Set the time between reconnect attempts. The default (0) causes the daemon to exit immediately after the initial connection attempt and no additional connection attempts are made. A non zero value set is the number of seconds the daemon will wait between connection attempts.
+.TP
+.B -h
+Print the usage text and exit.
+.TP
+.B -v
+Print the version number and exit.
+.SH "SEE ALSO"
+ekeyd(8), ekey-rekey(8), ekey-setkey(8)
+.SH AUTHOR
+Copyright \(co 2009 Simtec Electronics.
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy 
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights 
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+copies of the Software, and to permit persons to whom the Software is 
+furnished to do so, subject to the following conditions: 
+ 
+The above copyright notice and this permission notice shall be included in 
+all copies or substantial portions of the Software. 
+ 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+THE SOFTWARE. 

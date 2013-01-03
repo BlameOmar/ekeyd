@@ -1,0 +1,87 @@
+Simtec Electronics Entropy Key -- Host Software ChangeLog
+---------------------------------------------------------
+
+This document summarises the changes between public releases of the
+Entropy Key host software.
+
+v1.1.4
+	* Improve ekey-rekey command line handling so master key can
+	  be entered interactively.
+	* Improve ekey-rekey command locating suitable USB devices
+	  automatically.
+	* Improve host tools Makefile to install egd-linux if built
+	* Make EGD client cope with read timeouts
+
+v1.1.3
+	* Improve handling of failed rekeying. Will now attempt to
+	  re-establish a keyed session every 50 recived packets instead of
+	  leaving the connection "Long term key bad"
+	* Removed some debug to improve CPU consumption.
+	* PEM Decode speedup, courtesy of nix@esperi.org.uk
+	* EGD Entropy dispatch speedup, courtesy of nix@esperi.org.uk
+	* Key badness rework, courtesy of nix@esperi.org.uk
+	* EGD-Linux tool resilient in the face of EINTR of poll()
+
+v1.1.2
+	* Various improvements in internal buffer management.
+	* Improve serial number handling in ekey-rekey.
+	* Support hostnames in egd-linux.
+	  - This patch provided by Tollef Fog Heen of Collabora.
+	* Keyring writing in ekey-setkey is now more careful with
+	  its permissions.  Concept courtesy of Kees Cook of Debian
+	* Improve serial number handling in munin script.
+	  - This patch provided by Wouter Verhelst of Debian
+	* Improve the TotalEntropy munin graph by setting a minimum
+          for the Y axis.  This corrects issues in the graph when
+          the daemon restarts.
+
+v1.1.1
+	Fix bug where ekeyd would sit and spin if ekeydctl shutdown
+	was used to stop the daemon.
+	Improve logging and retry behaviour for ekeyd-egd-linux.
+	Add a --device option to ekey-rekey and make it remove any
+	spaces in the master key to make input more tolerant of
+	users copying the spaces from the master key card.
+	Update the state machine to better cope with unexpected
+	buffering of the packet stream causing long-term-key-bad
+	events where they were not correct.
+	Lots of bits to support MirBSD thanks to Thorsten Glaser.
+	Munin support updated and defaults altered to be of more
+	use to normal people.
+
+v1.1.0
+	Improve the control over ekeyd-egd-linux connection retrying.
+	Fix a memory leak in the EGD server implementation.
+	Various exit-path cleanups, courtesy of Eric Sesterhenn.
+
+v1.0.7
+	Support the rekeying of Entropy Key devices whose serial
+	numbers encode to contain a slash symbol.
+
+v1.0.6
+	Append entropy when writing to a file on disk.  Hold off on
+	issuing rekey nonces a little to produce more reliable
+	rekeying behaviour during high load scenarios.  Correct a
+	bug in the ulusbd which caused "Vanished?" messages which
+	were spurious as the devices were still connected.
+v1.0.5
+	Correct a logic hiccough in the no-pidfile path out of the
+	daemonise function used by the daemons.  Add some syslog()
+	to the ulusbd to better diagnose issues related to it.
+v1.0.4
+	Munin scripts, better handling of poll() related errors in
+	main daemon to allow for debugging via strace.  Pointless
+	writes in the EGD layer removed to reduce CPU consumption
+	when no entropy is available but there are clients 
+        requesting it.  An attempt at buildability on GNU/kFreeBSD.
+v1.0.3
+	Manual page updates, AUTHORS file, ekey-setkey now retries
+	more effectively than before.
+v1.0.2
+	Additional copyright and authoring information along with
+	clearer attribution for non-Simtec source in the software.
+v1.0.1
+	Corrected an issue related to multiple Entropy Key devices
+	attached to the same ekeyd instance.
+v1.0
+	First public release of the Entropy Key software.

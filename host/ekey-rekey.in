@@ -1,0 +1,170 @@
+#!/bin/sh
+
+if test "x$KEYRING" = "x"; then
+    KEYRING=@SYSCONFPREFIX@/keyring
+fi
+
+usage() {
+    cat <<EOF >&2
+ekey-rekey: Utility to re-key an Entropy Key's Long-term-key
+Usage:
+    ekey-rekey [-d|--device DEVICENODE] [SERIAL [MASTERKEY]]
+EOF
+}
+
+# settings
+DEVDIR=/sys/bus/usb/devices;
+
+# find an ekey by searching sysfs
+sysfs_find_ekey () {
+
+    for USBDEV in $(ls ${DEVDIR});do 
+	USBDEVDIR=${DEVDIR}/${USBDEV}; 
+	if [ -f "${USBDEVDIR}/idVendor" -a -f "${USBDEVDIR}/idProduct" -a -f "${USBDEVDIR}/serial" ];then 
+	    if [ "$(cat ${USBDEVDIR}/idVendor)" = "20df" -a "$(cat ${USBDEVDIR}/idProduct)" = "0001" ]; then
+		# check the serial number either for not being specified or it matches given value
+		if [ "x$1" = "x" -o "$(cat ${USBDEVDIR}/serial)" = "$1" ]; then
+		    echo ${USBDEV} $(cat ${USBDEVDIR}/serial)
+		    break;
+		fi
+	    fi 
+	fi
+    done
+}
+
+sysfs_find_ekey_dev () {
+    SYSFS_DEV_MAJ_MIN_FILE=${DEVDIR}/${1}:1.0/tty/tty*/dev
+    if [ -f ${SYSFS_DEV_MAJ_MIN_FILE} ]; then
+	SYSFS_DEV_MAJ_MIN=$(cat ${SYSFS_DEV_MAJ_MIN_FILE})
+	DEV_MAJ=$(echo ${SYSFS_DEV_MAJ_MIN} | cut -d : -f1)
+	DEV_MIN=$(echo ${SYSFS_DEV_MAJ_MIN} | cut -d : -f2)
+
+	find /dev -type c | xargs stat -c "%t:%T %n" | egrep "^$(printf "%x" ${DEV_MAJ}):$(printf "%x" ${DEV_MIN})" | cut -d ' ' -f2
+
+    fi
+}
+
+if test $# -ge 1; then
+
+optloop=1
+while test ${optloop} = 1; do
+    case x$1 in
+    x-d|x--device)
+	DEVICE=$2
+	shift
+	shift
+	;;
+    x--device=*)
+	DEVICE=$(echo "x$1" | sed 's/^x--device=//')
+	shift
+	;;
+    x-h|x-\?|x--help)
+	usage
+	exit 0
+	;;
+    x-V|x--version)
+	echo "ekey-rekey version "@EKEYD_VERSION_S@
+	exit 0
+	;;
+    x--)
+	shift
+	break
+	;;
+    x|x-*)
+	# empty or unknown -o or unknown --long-option
+	usage
+	exit 1
+	;;
+    *)
+	# non-option argument
+	optloop=0
+	;;
+    esac
+done
+
+fi
+
+# first open parameter must be the serial number
+SERIAL=$1
+
+if [ "x${SERIAL}" = "x" ]; then
+    # no serial found go looking for the user
+    FOUND_EKEY=$(sysfs_find_ekey)
+
+    if [ "x${FOUND_EKEY}" = "x" ];then
+	echo >&2 "No Entropy Key could be found. Is it connected?"
+	exit 2
+    fi
+    FOUND_EKEY_DEV=$(sysfs_find_ekey_dev ${FOUND_EKEY})
+
+    SERIAL=$(echo ${FOUND_EKEY} | cut -d ' ' -f2)
+    
+    echo "Found Entropy Key Serial: ${SERIAL}"
+else
+    # user supplied serial number
+
+    echo "Specified Entropy Key Serial: ${SERIAL}"
+
+    #look for appropriate device node just in case
+    FOUND_EKEY=$(sysfs_find_ekey ${SERIAL})
+    if [ "x${FOUND_EKEY}" != "x" ];then
+	FOUND_EKEY_DEV=$(sysfs_find_ekey_dev ${FOUND_EKEY})
+    fi
+
+    shift
+    MASTERKEY=$(echo $@ | tr -d ' ')
+fi
+
+# alter the serial number to ensure it contains no path separators
+SERIALD="$(echo "${SERIAL}" | tr / .)"
+SERIALU="$(echo "${SERIAL}" | tr / _)"
+
+DEVPATHS=""
+
+if test "x" != "x$DEVICE"; then
+    DEVPATHS="$DEVICE "
+fi
+
+DEVPATHS="${DEVPATHS}/dev/entropykey/${SERIALD} /dev/entropykey/${SERIALU} /var/run/entropykeys/${SERIALD} /var/run/entropykeys/${SERIALU} ${FOUND_EKEY_DEV}"
+
+for DEVPATH in ${DEVPATHS}; do
+    if test -c "${DEVPATH}" -o -h "${DEVPATH}" -o -p "${DEVPATH}" -o -S "${DEVPATH}"; then
+        test "x${NODETOUSE}" = "x" && NODETOUSE="${DEVPATH}"
+    fi
+done
+
+if test "x" = "x$NODETOUSE"; then
+    echo >&2 "Unable to find any device node or socket for $SERIAL"
+    echo >&2 "Looked in: $DEVPATHS"
+    exit 2
+fi
+
+ctl() {
+    ekeydctl "$@" 2>/dev/null
+}
+
+
+# Try to ensure that any running daemon ignores the key
+ctl remove "$SERIAL"
+test $? = 4 && {
+    echo >&2 "Warning: Could not detach key from daemon."
+    echo >&2 "         If there is a problem setting the long-term key try"
+    echo >&2 "         stopping the daemon before re-running the rekey tool."
+}
+
+# Generate the new key
+if [ "x${MASTERKEY}" = "x" ];then
+    ekey-setkey -s "$SERIAL" -f "$KEYRING" "$NODETOUSE"
+else
+    ekey-setkey -s "$SERIAL" -m "$MASTERKEY" -f "$KEYRING" "$NODETOUSE"
+fi
+
+if test $? -ne 0; then
+    echo >&2 "Unable to generate new long-term key"
+fi
+
+# Re-add the new keyring
+ctl keyring "$KEYRING"
+
+# Add the new key and hope for the best
+ctl add "$NODETOUSE"

@@ -1,0 +1,12 @@
+# Simtec Electronics UDEKEY01 Rules for udev
+# Alternative UDEV rules for the unix-domain-socket mode instead of relying on cdc-acm
+
+# Detect an Entropy Key being inserted
+# ACTION=="add", SUBSYSTEM=="usb", DEVTYPE=="usb_device", ATTRS{idVendor}=="20df", ATTRS{idProduct}=="0001", IMPORT{program}="usb_id --export %p"
+ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="20df", ATTRS{idProduct}=="0001", IMPORT{program}="/bin/echo ENTROPY_KEY_SERIAL=$attr{serial}"
+
+# And tell the ekeyd about the new device.
+ACTION=="add|change", ENV{ENTROPY_KEY_SERIAL}!="", RUN+="/lib/udev/entropykey.sh"
+
+# And remove the entropy key from the daemon on device removal
+ACTION=="remove", ENV{ENTROPY_KEY_SERIAL}!="", RUN+="/lib/udev/entropykey.sh"

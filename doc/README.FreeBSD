@@ -1,0 +1,169 @@
+Entropy Key - FreeBSD 
+=====================
+
+Overview
+--------
+
+Although FreeBSD is not a directly supported Operating System there
+have been numerous reports of success compiling and using the Entropy
+Key tools from source.
+
+The main issues appear to be getting the kernel USB tty driver to
+recognise the Entropy key. 
+
+Ekey source changes
+-------------------
+
+
+
+FreeBSD 8.0-RELEASE
+-------------------
+
+Rob Neal notes that on 8.0 No source changes were required to the
+kernel to get teh Entropy Key USB tty device to appear. The options
+'device ucom' and 'device umodem' were needed in the kernel because
+they are not in GENERIC.
+
+
+FreeBSD 7.1-STABLE
+------------------
+
+Rob Neal has kindly provided the following notes to get the Entropy
+Key working on this release.
+
+
+--- /usr/src/sys/dev/usb/old.umodem.c	2010-01-25 20:40:59.000000000 -0700
++++ /usr/src/sys/dev/usb/umodem.c	2010-01-25 21:10:34.000000000 -0700
+@@ -127,6 +127,7 @@
+ 	{ USB_VENDOR_KYOCERA, USB_PRODUCT_KYOCERA_AHK3001V, 0 },
+ 	{ USB_VENDOR_SIERRA, USB_PRODUCT_SIERRA_MC5720, 0 },
+ 	{ USB_VENDOR_CURITEL, USB_PRODUCT_CURITEL_PC5740, 0 },
++	{ USB_VENDOR_SIMTEC, USB_PRODUCT_SIMTEC_EKEY, 0 },
+ 	{ 0, 0, 0 },
+ };
+ 
+@@ -249,6 +250,9 @@
+ 		    umodem_products[i].product == UGETW(dd->idProduct) &&
+ 		    umodem_products[i].interface == id->bInterfaceNumber) {
+ 			ret = UMATCH_VENDOR_PRODUCT;
++		if ((UGETW(dd->idVendor) == USB_VENDOR_SIMTEC) &&   
++			(UGETW(dd->idProduct) == USB_PRODUCT_SIMTEC_EKEY))
++			return(UMATCH_VENDOR_PRODUCT);
+ 			break;
+ 		}
+ 	}
+
+
+ Driver: 
+/usr/src/sys/dev/usb/usbdevs
+		Add Simtec vendor id and product id entries in the appropriate
+		alphabetical locations:
+
+		vendor SIMTEC       0x20df  Simtec Electronics
+
+		/* Simtec Electronics */
+		product SIMTEC EKEY 0x0001 Ekey Entropy Device
+
+/usr/src/sys/dev/usb/umodem.c
+	see diffs in umodem.diff. Modify to recognize the Simtec vendor id 
+	and product id, and ignore the missing bulk data in. Which was 
+	erratic on my box, sometimes it found it, sometimes not.
+
+	The ucom driver is also required, if not already present.
+	Loading the umodem driver will result in /dev/cuaUx and /dev/ttyUx
+	entries being created. Use the /dev/cuaUx entry to represent the 
+	key. /dev/ttyUx barked loudly, cblock issue. 
+/etc/devd.conf:
+	attach 100 { /* 100 or whatever priority rank you like */
+    	match "vendor" "0x20df";
+    	match "product" "0x0001";
+    	action "logger Ekey $sernum vendor $vendor product $product";
+    	action "ln -fs /dev/cuaU0 /var/run/entropykeys/M.9rBjBLNzFWQCFD";
+	// note: $device-name (ucom0 in this case) could be parsed to 
+	// auto-construct the /dev/cuaUx entry. I'm lazy. 
+    	action "/usr/sbin/ekeyd"; 
+	};
+
+	detach 100 {
+    	match "vendor" "0x20df";
+    	match "product" "0x0001";
+		action "ekeydctl stats $sernum | logger";
+		action "ekeydctl shutdown";
+		action "logger Ekey $sernum removed from system";
+	};
+	
+/ekey/src/daemon/Makefile
+	LUA include location is wrong:
+	LUA_INC ?= -I/usr/local/include/lua5.1
+/ekey/src/daemon/crc8.h
+	add
+	typedef int ssize_t;
+	before the crc8() definition
+/etc/entropykeys/xxx
+	careful, they get whacked by gmake install.
+	
+use gmake instead of make.                      
+
+/etc/entropykey/ekeyd.conf
+	lua and luasockets are needed for the ulusbd, but AF_UNIX support isn't
+	part of the package, so things fall down. Use TCPControlSocket, comment
+	out the UnixControlSocket
+
+ulusbd refused to find the usb device, but usbdev was happy:
+root@bulldog~: usbdevs -v
+Controller /dev/usb0:
+addr 1: full speed, self powered, config 1, UHCI root hub(0x0000), Intel(0x0000)
+, rev 1.00
+ port 1 addr 2: full speed, power 76 mA, config 1, Entropy Key(0x0001), Simtec E
+lectronics(0x20df), rev 2.00
+ port 2 addr 3: full speed, power 98 mA, config 1, Geek Squad(0x0031), Geek Squa
+d(0x154b), rev 1.00
+
+root@bulldog~: ekey-ulusbd -b0 -d2 -p/dev
+Scanning for USB device 0/2
+MRN bus->/dev/usb0<-found
+Error locating Simtec Entropy Key at 0/2
+root@bulldog~: ekey-ulusbd -b0 -d1 -p/dev
+Scanning for USB device 0/1
+MRN bus->/dev/usb0<-found
+Error locating Simtec Entropy Key at 0/1
+root@bulldog~: ekey-ulusbd -b0 -d3 -p/dev
+Scanning for USB device 0/3
+MRN bus->/dev/usb0<-found
+Error locating Simtec Entropy Key at 0/3
+
+I hacked in a fprintf to display what bus it thought it was finding. 
+
+but things are fine in ekeyville:
+root@bulldog~: ekeydctl list
+NR,OK,Status,Path,SerialNo
+1,YES,Running OK,/var/run/entropykeys/M.9rBjBLNzFWQCFD,M/9rBjBLNzFWQCFD
+
+root@bulldog~: ekeydctl stats $SER
+BytesRead=11532416
+BytesWritten=794
+ConnectionNonces=44
+ConnectionPackets=180194
+ConnectionRekeys=44
+ConnectionResets=2
+ConnectionTime=1432
+EntropyRate=32128
+FipsFrameRate=1.61
+FrameByteLast=11532352
+FramesOk=180194
+FramingErrors=0
+KeyDbsdShannonPerByteL=2.91
+KeyDbsdShannonPerByteR=3.03
+KeyRawShannonPerByteL=2.84
+KeyRawShannonPerByteR=2.86
+KeyRawShannonPerByteX=2.83
+KeyTemperatureC=31.75
+KeyTemperatureF=89.15
+KeyTemperatureK=304.9
+KeyVoltage=3.302
+PacketErrors=1
+PacketOK=180193
+ReadRate=64426
+TotalEntropy=5750912
+WriteRate=4
+

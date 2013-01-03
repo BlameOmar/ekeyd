@@ -1,0 +1,54 @@
+.TH ekeyd 8 "19th July 2009"
+.SH NAME
+ekeyd - Entropy Key Daemon
+.SH SYNOPSIS
+.B ekeyd
+[ \-f \fIconfigfile\fR ]
+[ \-p \fIpidfile\fR ]
+[ \-v ]
+[ \-h ]
+.SH DESCRIPTION
+.PP
+.I ekeyd
+is a daemon which connects to Simtec Entropy key devices and places the read entropy in the kernels pool.
+.SH OPTIONS
+.TP
+\fB-f\fR \fIconfigfile\fR
+Specify the name and path of the configuration file, default \fI/etc/entropykey/ekeyd.conf\fR.
+\fB-p\fR \fIpidfile\fR
+Specify the name and path of the file used to record the \fBekeyd\fR process ID.
+.TP
+.B -h
+Print the usage text and exit.
+.TP
+.B -v
+Print the version number and exit.
+.SH "CONFIG-FILE"
+.PP
+All the options controlling the operation of ekeyd are stored in its 
+configuration file.
+.PP
+The syntax of the config file is a series of statements controlling the subsequent operation of the daemon.
+.SH "SEE ALSO"
+ekeyd.conf(5), ekey-rekey(8), ekey-setkey(8)
+.SH AUTHOR
+Copyright \(co 2009 Simtec Electronics.
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy 
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights 
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+copies of the Software, and to permit persons to whom the Software is 
+furnished to do so, subject to the following conditions: 
+ 
+The above copyright notice and this permission notice shall be included in 
+all copies or substantial portions of the Software. 
+ 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+THE SOFTWARE. 

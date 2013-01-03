@@ -1,0 +1,89 @@
+-- -*- Lua -*-
+
+-- Sample configuration file for ekeyd
+
+-- -----------------------------------------------[ General setup ]-----
+
+-- If you want a TCP control socket on 127.0.0.1 then uncomment this
+-- command.
+-- Please note that there is no protection on a TCP socket, anyone on
+-- the box can connect to it and there is no authentication process.
+-- TCPControlSocket "1234"
+
+-- The unix control socket is typically what we use
+UnixControlSocket "@RUNTIMEPREFIX@/ekeyd.sock"
+
+-- The keyring contains the keys for the long-term rekey If you change
+-- this location from the default then be aware that the
+-- long-term-rekey tool may not work.
+Keyring "@SYSCONFPREFIX@/keyring"
+
+-- The daemon background operation may be supressed. In this mode the
+-- daemon will run in the foreground and the controlling tty will not
+-- be released.
+-- Daemonise(false)
+
+-- -------------------------------------------------[ Output Mode ]-----
+
+-- Only one output mode is permitted to be active. Typically on Linux
+-- that would be the kernel output mode, however instead you can opt
+-- to use the EGD interface. Various other daemons then support taking
+-- EGD interfaces and adding entropy to the kernel instead, allowing
+-- multiple clients to retrieve entropy by various means.
+
+-- The SetOutputToKernel option places all the gathered entropy into
+-- the kernel pool. The data placed into the kernel pool is
+-- conservatively estimated to contain 7 shannons of entropy per byte
+-- added.
+-- Note that the data coming from the UDEKEY01 should have one Shannon
+-- of entropy per bit so this value could quite safely be set to
+-- 8. The default value only has the effect of reducing the rate
+-- entropy is mixed into the kernel pool and no other adverse
+-- affect. This default is selected as an conservative choice which is
+-- generally preferable when dealing with random sources.
+@KERNOUTOK@SetOutputToKernel(7)
+
+-- The daemon may support the EGD (Entropy Gathering Daemon) socket
+-- protocol. There are two choice to create either a TCP or Unix
+-- socket which speaks the EGD protocol.
+-- Note that you cannot have kernel output *and* EGD output, they are
+-- mutually exclusive.
+-- The EGD protocol support assumes entropy coming off the ekeys is at
+-- the level of 8 shannons per byte and this cannot be changed as it
+-- is a limitation of the EGD protocol itself.  The TCP socket can be
+-- given an optional parameter to specify the IP address to bind to.
+-- It will default to 127.0.0.1 if not specified.
+
+@KERNOUTNOTOK@EGDTCPSocket(8888 --[[, "127.0.0.1" ]])
+-- EGDUnixSocket "@EGDSOCK@"
+
+-- EGDUnixSocket can optionally take an octal mode string and
+-- username and group to chmod and chown the socket to.
+-- If you do not wish to change the user or group, use empty strings.
+-- You cannot change the user/group without also providing a mode string.
+-- The default is to leave the user/group alone and set the socket to
+-- mode 0600
+-- EGDUnixSocket("@EGDSOCK@", "0660", "root", "entropyusers")
+
+-- The SetOutputToFile option writes all gathered entropy to the named
+-- file. No additional processing is performed. The output file must
+-- exist before the daemon is run. This option is generally only
+-- useful if the user wishes to gather data for subsequent testing.
+-- Note as with all the other output options this may be the only
+-- output selection and may not be used with either the kernel or EGD
+-- output enabled.
+
+-- SetOutputToFile "/tmp/entropy" 
+
+-- -----------------------------------------------[ Device Config ]-----
+
+-- Add entropy keys from /dev/entropykey where our default udev rules
+-- will place symbolic links (on GNU/Linux operating systems).
+@UDEVOK@AddEntropyKeys "/dev/entropykey"
+-- Also add keys from /var/run/entropykeys where the UNIX domain socket
+-- rules will place sockets if using them.
+@UDEVOK@AddEntropyKeys "/var/run/entropykeys"
+-- On OpenBSD/MirBSD you will probably need to use something like this
+-- instead (match the device minor (here: 0) with the ucom(4) instance
+-- your umodem(4) device attaches to):
+-- AddEntropyKey "/dev/cuaU0"

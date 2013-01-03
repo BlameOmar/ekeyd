@@ -1,0 +1,46 @@
+Entropy Key - Centos 5 Operating system notes
+=============================================
+
+The following is the Centos 5/RHEL 5 usage notes for the Entropy Key.
+
+Centos 5.0 - 5.4
+----------------
+
+Please be aware of the issues outline below and verify operation in
+your specific use case.
+
+The cdc_acm kernel driver module in earlier CentOS 5 (version
+2.6.18-128.el5 reported) has been reported to have
+significant issues. Symptoms include complete system lockups requiring
+a reset to continue. 
+
+On these systems we advise the use of the userspace USB driver to
+communicate with the entropy key. The ekeyd-ulusbd package when
+installed provides the udev rules to facilitate this method of
+operation. Please ensure the cdc_acm driver is blacklisted as
+appropriate for your configuration.
+
+
+CentOS 5.5 - 5.6
+----------------
+
+Centos 5.5 and 5.6 shipped with a kernel version (version 2.6.18-194.el5
+and 2.6.18-238.el5 respectively) where the CDC ACM driver appears to
+operate correctly with the standard tty based interface.
+
+Centos 5.5 users should only install the ekeyd-ulusbd package for the
+userspace driver if they experience actual problems in their specific
+configuration. The kernel cdc_acm driver must be manually disabled for
+this mode of operation to work correctly.
+
+Dynamic udev based insertion and removal of the entropy key works
+correctly. Please ensure the software is installed *before* inserting
+the entropy key or the udev based autodetection will not operate and
+the ekeyd daemon will not automatically add the key. This can be
+corrected simply by issuing "rmmod cdc_acm;modprobe cdc_acm" once the
+software package is installed.
+
+The installation will not automatically start the entropy key daemon
+after installation, it can be started in the usual way by running
+"/etc/init.d/ekeyd start" as root.
+

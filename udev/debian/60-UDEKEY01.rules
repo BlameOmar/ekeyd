@@ -1,0 +1,14 @@
+# Simtec Electronics UDEKEY01 Rules for udev
+
+# Detect an Entropy Key being inserted
+ACTION=="add|change", SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="20df", ATTRS{idProduct}=="0001", IMPORT{program}="usb_id --export %p"
+ACTION=="add|change", SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="20df", ATTRS{idProduct}=="0001", IMPORT{program}="/bin/echo ENTROPY_KEY_SERIAL=$env{ID_SERIAL_SHORT}"
+
+# Add the /dev/entropykey/FOO symbolic link
+ACTION=="add|change", ENV{ENTROPY_KEY_SERIAL}!="", SYMLINK+="entropykey/$env{ENTROPY_KEY_SERIAL}"
+
+# And tell the ekeyd about the new device.
+ACTION=="add|change", ENV{ENTROPY_KEY_SERIAL}!="", RUN+="/lib/udev/entropykey.sh"
+
+# And remove the entropy key from the daemon on device removal
+ACTION=="remove", ENV{ENTROPY_KEY_SERIAL}!="", RUN+="/lib/udev/entropykey.sh"

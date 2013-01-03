@@ -1,0 +1,491 @@
+Entropy Key Protocol (Version 0)
+================================
+
+The Entropy Key communicates to the host in packets, while the host
+communicates to the device in a simple byte stream.  The packets from
+the device to the host are framed to make it easy to view a stream in
+a text console or serial terminal emulator such as hyperterminal or
+minicom.
+
+All examples in this document will be taken from the Entropy Key with
+the serial number NwBvBlg3OTBJORFD.
+
+Hashes and MACs
+---------------
+
+Whenever we talk about using a Skein hash in the Entropy Key protocol
+or associated documentation, we are talking about the 256 bit Skein
+hash as described on http://www.skein-hash.info/ set to output at 256
+bits.  Skein provides for personalisation strings which are used to
+ensure that even if the same data is hashed for different purposes, it
+will not produce the same hash.  For the Entropy Key, the
+personalisation strings related to the protocol are:
+
+  RS: "20090609 support@simtec.co.uk EntropyKey/v1/ReKeyingState                                       "
+ PMS: "20090609 support@simtec.co.uk EntropyKey/v1/MessageAuthenticationCodeState                      "
+ EES: "20090609 support@simtec.co.uk EntropyKey/v1/EntropyEncryptionState                              "
+ LRS: "20090609 support@simtec.co.uk EntropyKey/v1/LongTermReKeyingState                               "
+LKMS: "20090609 support@simtec.co.uk EntropyKey/v1/MessageAuthenticationCodeStateForLongTermReKeying   "
+
+Note that the spaces *are* part of the personalisation strings, but
+the quote marks (") *are not* part of the strings.
+
+The RS string is used to personalise the hash which creates the
+Session Keys.  The PMS personalises the state which is used to create
+the MACs you see on each packet.  The EES is used to personalise the
+hash which creates the one-time-pads for the E! packets.  The LRS is
+used to personalise the hash which creates the Long-Term Keys and the
+LKMS is used to personalise the hash which is used to MAC the host's
+nonce for rekeying the Long-Term Key.
+
+Whenever a Skein 256-256 state is used, it is prepared as follows:
+
+A Skein 256-256 state in TREE_INFO_SEQUENTIAL mode is created using
+the concatenation of the serial number of the device (as 12 bytes of
+binary, not 16 characters of PEM) and a 32 byte (256 bit) secret.  The
+Skein is then switched into personalisation input mode and the 96
+character personalisation string is fed to the Skein.  The Skein is
+then switched back into message input mode ready for the message.
+
+Thus, when we talk about a Skein, personalised by the RS, keyed with
+the Long-Term Key, the following is performed:
+
+Skein_256_Init_Ex(&state, 256, SKEIN_CFG_TREE_INFO_SEQUENTIAL,
+                  concatenationof(serialnumber, longtermkey), 44);
+Skein_Start_New_Type(skein, PERS);
+Skein_256_Update(skein, RS_personalisationstring, 96);
+Skein_Start_New_Type(skein, MSG);
+
+This is in the PrepareSkein function of the sample host software in
+the skeinwrap.c file which can be found in the device directory.
+
+The two ways in which a Skein state can be finalised are _Final and
+_Final_Pad. The former is used for hashing and the latter is used for
+MACs.  In both cases, 256 bit output is generated.  MACs are presented
+as the first 24 bits and last 24 bits of the 256 bit output, PEM
+encoded and concatenated.
+
+PEM encoding
+------------
+
+Whenever binary information is to be transmitted, either to, or from
+the device, it is PEM encoded.  The particular PEM encoding used by
+the Entropy Key is PEM64 with the following dictionary:
+
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+The character '=' is used to indicate filler, so if only one byte is
+to be PEM encoded, it will appear somewhat like: 'AA==', if two bytes
+are encoded 'AAA=' and if three bytes are encoded 'AAAA'.
+
+Each (up-to) three byte input is encoded into four characters of PEM64
+output.
+
+PEM encode and decode functions can be found in pem.c in the
+device/frames directory of the sample host software.
+
+Framing
+-------
+
+Each packet (or frame) sent from the Entropy Key device to the host is
+64 bytes long.  It consists of four sections. The 'Start-Of-Frame'
+(SOF) marker, the content of the frame, the MAC for the content, and
+the 'End-Of-Frame' (EOF) marker.
+
+The SOF is '* ' and the EOF is '\r\n' (Characters 13 and 10).  If the
+host has received 64 bytes whose start and end match those markers,
+then it has received a frame and it can proceed to the next level of
+checking.
+
+The MAC is calculated over the content of the frame and is the eight
+PEM characters directly preceeding the EOF.  The content over which
+the MAC is calculated is therefore 52 characters long.  The MAC is
+calculated using a Skein personalised by the PMS and keyed with the
+Session key which then has the packet's content added to it, before
+being finalised with the _Final_Pad variant of the Skein finalisation.
+
+Packet contents
+---------------
+
+Once the MAC has been verified, the next layer of the frame can be
+peeled back.  Each frame consists of a frame type and then the frame
+content.  The frame type is a single character indicating which kind
+of frame it is, and then a character indicating the frame's encoding.
+
+Text frames (>)
+---------------
+
+Frames with the '>' character for their encoding type are text frames
+and the remaining 50 characters in the frame are considered to be
+unencoded text.  Text frames are padded with spaces to make their
+content a full 50 characters in length.  These spaces are not
+considered part of the payload of the frame, but are important when
+calculating the MAC.
+
+Binary frames (!)
+-----------------
+
+Frames with the '!' character for their encoding type are binary
+frames and they have two parts to their payload.  First, two
+characters are a PEM64 12 bit value called the sub-code or the
+extra-information field. The remaining 48 characters comprise up to
+twelve PEM quads (decoding to up-to 36 bytes) which comprise the
+actual payload of the frame.  If not all PEM quads are used, then the
+frame is padded with spaces to make it up to the full size.
+
+Breakdown of a frame
+--------------------
+
+Binary frames look like this:
+
+* S!AANwBvBlg3OTBJORFD                                Al/Smw1b
+1123445555555555555555666666666666666666666666666666667777777788
+
+1. SOF
+2. Frame type
+3. Frame encoding
+4. Binary frame sub-code or extra-information field.
+5. Binary frame payload
+6. Padding
+7. MAC
+8. EOF (The \r\n)
+
+
+Text frames look like this:
+
+* I>T03143 V03254                                     apKTNVoy                  
+1123444444444444455555555555555555555555555555555555556666666677
+
+1. SOF
+2. Frame type
+3. Frame encoding
+4. Text frame payload
+5. Padding
+6. MAC
+7. EOF (The \r\n)
+
+
+Serial Number Frames
+--------------------
+
+Serial number frames have the type 'S' and are binary frames. The
+serial number frame is the only one which is guaranteed to remain
+consistent between versions of the Entropy Key protocol.  You can
+reset the Entropy Key and provoke a serial number frame by sending ^C
+at any time (ASCII character 3).  This is described below.
+
+The serial number frame for our example key looks like this:
+
+* S!AANwBvBlg3OTBJORFD                                Al/Smw1b
+
+The sub-code field is 'AA' which decodes to 0x000 and indicates
+version 0 of the Entropy Key protocol.  This document describes
+version 0 of the protocol.
+
+The rest of the payload 'NwBvBlg3OTBJORFD' is the PEM encoded serial
+number of the device and will be identical to the serial number which
+can be retrieved from the USB device descriptor.
+
+When a serial number frame is received, it can be assumed that the
+session key has been reset to zero. (i.e. the session key is 32 bytes
+all zero) and thus the MAC can be checked to ensure that the packet
+has not become corrupted.
+
+
+Out-Of-Sequence-Numbers (Re-Key Me) Frames
+------------------------------------------
+
+When the device has generated and verified a 20000 bit block of
+entropy ready for sending to the host, but it has run out of sequence
+numbers (or has yet to be given a Session Key at all) it will issue a
+re-key me packet.  They look as follows:
+
+* k>Unable to send entropy. Please re-key session.    VqrrSb4k                  
+
+The actual text of the packet is unimportant and is filled out purely
+to make it clear to a human observer what the meaning of the packet
+is.  The lower-case 'k' is all that is relevant.
+
+Information Frames
+------------------
+
+Periodically the device will generate information frames which provide
+data about the internal states of the device.  Information frames are
+indicated by the 'I' frame type and are text frames.
+
+Information frames carry a payload of the form:
+
+<typecharacter><number>{:<number>}*
+
+i.e. a type character tells the host what information follows, and
+then some number of colon separated ascii-encoded integers.  The
+number of integers is dependent on the type of information.
+
+A frame may carry multiple of these information blocks, separated by a
+space character.
+
+Version 0 of the protocol defines the following types:
+
+ T: The temperature of the core of the Entropy Key.
+ V: The primary voltage of the Entropy Key
+ F: Snapshot of the state of the FIPS 140-2 monitors.
+ S: Snapshot of the state of the generators and the key itself.
+
+The temperature of the entropy key is supplied as an integer
+representing tenths of a Kelvin.  The voltage is supplied as an
+integer representing millivolts.
+
+For example:
+
+* I>T03150 V03254                                     6ihYwAqo                  
+
+This frame indicates a temperature of 315.0 K which is approximately
+42 degrees Celsius, or 107 degrees Fahrenheit), and a voltage of 3.254
+volts.
+
+The FIPS snapshot consists of five numbers. The first is the number of
+FIPS 140-2 frames (20000 bits) which have been processed since the
+counters last reset.  The second number indicates the total number of
+failures in that sample set.  The third number indicates how many of
+those failures failed the 'monobit' test.  The fourth number indicates
+how many of the failures failed the 'poker' test.  The fifth number
+indicates how many of the failures failed the 'runs' test.
+
+For example:
+
+* I>F07342:00000:00000:00000:00000                    1L9eG/G8                  
+
+This frame indicates that in the past 7342 frames, none have failed
+the FIPS 140-2 tests.
+
+The state snapshot frame consists of nine values.
+
+* I>S08052:23751:23792:23584:07112:20876:08063:24150:0Sr3rR9o3                  
+
+As can be seen here, the state snapshot fills the frame entirely.  If
+we break the frame down, we get:
+
+08052:23751:23792:23584
+
+This indicates that in this snapshot, 8052 bytes have been read from
+the quantum effect generators (64416 bits).  The "left-hand" generator
+stream has an estimated 23751 shannons of entropy in total, the
+"right-hand" generator stream has an estimated 23792 shannons of
+entropy in total.  The exclusive-OR of the two streams has an
+estimated 23584 shannons of entropy in total.
+
+These indicators will reset every 80Kbit of raw data read of the two
+internal generators.
+
+07112:20876
+
+This indicates that the "left-hand" stream when debiassed has an
+estimated 20876 shannons of entropy in 7112 bytes.
+
+08063:24150
+
+This indicates that the "right-hand" stream when debiassed has an
+estimated 24150 shannons of entropy in 8063 bytes.
+
+0
+
+This indicates that the Entropy Key device has not detected any
+intrusion or failure mode.
+
+This value is in fact not a simple ascii-encoded integer, but is a
+character which takes on the values in daemon/failmodes.h in the
+sample host software:
+
+  0: No failure
+
+  1: Left generator is no longer random
+  2: Right generator is no longer random
+  3: Generators have become correlated
+
+  4: Left generator is strongly biassed
+  5: Right generator is strongly biassed
+  
+  7: Temperature detected below threshold
+  8: Temperature detected above threshold
+  9: FIPS 140-2 tests exceeded threshold for failed blocks
+  
+  A: Voltage too low
+  B: Voltage too high
+
+Session re-key frames
+---------------------
+
+When rekeying the session, the host sends a nonce to the device.  In
+response, the device sends 32 bytes of entropy in a binary re-key
+frame.  Directly after this frame has been sent, the session key is
+recalculated.
+
+* K!AA6XxLwelzehWDH8ofVA7moL76KiQj0ruKmqs9T7ygW/Q=    Qkbxfpr4                  
+
+The sub-code (extra-information) field indicates how many bytes of
+nonce the device received in the re-keying instruction.
+
+Entropy frames
+--------------
+
+Entropy frames are binary frames whose sub-code (extra-information)
+field indicates the sequence number of the entropy packets.  The
+payload is a 256 bit (32 byte) entropy packet which has been
+encrypted.
+
+* E!UYIYK1Z/uc21bcnUi9QF37X+rgByqWP+RJdvcaSBWNBhY=    OIq9Dvd3                  
+
+The encryption is performed by taking a Skein state personalised with
+the EES, keyed with the session key; updating it with the two
+characters of PEM encoded sequence number and then finalising it
+before exclusive-ORing it with the entropy to be transmitted.
+
+Long-Term-Rekey MAC acknowledge frames
+--------------------------------------
+
+When the client sends Mxxxxxxxx to indicate the MAC of the nonce it is
+about to send in order to rekey the Long-Term key, the device responds
+with an 'M' frame. The content of the frame is irrelevant and provided
+only for human observers.
+
+* M>Long-term rekey unlocked                          vrHSYIoF                  
+
+All that is relevant in this frame is the 'M' and that its MAC is valid.
+
+Long-Term-Rekey acknowledge frames
+----------------------------------
+
+When rekeying the long-term key, the host sends a nonce to the
+device. In response, the device sends 32 bytes of entropy in a binary
+long-term-re-key frame.  Directly after this frame has been sent, the
+long-term key is recalculate and stored to non-volatile storage on the
+device.
+
+* L!AA6XxLwelzehWDH8ofVA7moL76KiQj0ruKmqs9T7ygW/Q=    Qkbxfpr4                  
+
+The sub-code (extra-information) field indicates the number of bytes
+of nonce which have been received by the device.  The rest of the
+packet is the entropy to use to create the new long-term key.
+
+Long-Term-Rekey failure frames
+------------------------------
+
+If the long-term-rekey request fails for any reason, the device
+responds with an 'l' frame. 
+
+For example, either of the following may be returned:
+
+* l>Long-term rekey locked-out                        m/wvdw2F                  
+* l>Nonce MAC does not match                          6l+FxwYn                  
+
+The 'l' is the only significant part of this packet.  The textual
+description of the failure mode is provided only for human observers.
+
+Unknown input frames
+--------------------
+
+Should the host send an unexpected or incomprehensible byte to the
+device, the device will respond with an unknown-input frame.  Any
+other bytes received in that USB packet will be discarded.
+
+* W>Unknown Input Character 0x65                      TRNC7UwS                  
+
+The only significant part of this frame to the host is the 'W', the
+text content is provided only for human observers.
+
+Generators have gone bad frames
+-------------------------------
+
+During the re-keying process (either for session or long-term key) if
+the generators go bad (or an attack is detected) then the rekeying
+operation will be abandoned and a 'B' frame will be emitted.
+
+* B>Generators have gone bad, rekeying abandoned.     Dv+8RVaa
+
+The only significant part of this frame to the host is the 'B', the
+text content is provided for human observers.
+
+Subsequent to receiving such a frame, should the host wish to know
+what failure mode was encountered, it should wait for an information
+frame indicating the state snapshot of the device.
+
+
+Communication from the host to the device
+-----------------------------------------
+
+The communication from the host to the device takes the form of a byte
+stream.  Most commands are single bytes, followed by some amount of
+arguments and then a terminator where needed.
+
+The only command byte which is *always* accepted no matter what state
+the device is in, is ^C (ASCII character 3) which will reset the state
+machines on the device.
+
+NOTE: Resetting the state machines will not remove the fail-mode
+lockout on a device. To achieve that you must power down the device.
+
+Reset command
+-------------
+
+The Entropy Key will reset upon receipt of a ^C (ASCII character 3)
+or, if idle, upon receipt of 'R' or 'r'.
+
+After reset, the device will send a serial number packet to start the
+exchange.
+
+
+Session re-key command
+----------------------
+
+When the host wants to re-key the session with the device, it sends a
+'k' or 'K' followed by some number of PEM quads which encode the nonce
+which the host wishes to use in the re-keying process.  Once all the
+PEM quads have been transmitted, the host sends a '.' to signify that
+it is ready to re-key.
+
+The device responds with a K! packet (see above) and subsequently
+recalculates the session key for itself.
+
+The session key is calculated by taking a Skein personalised with the
+RS, keyed with the long-term-key, into which is mixed the entropy from
+the device, and then the nonce from the host, before being finalised
+to produce a 256 bit key.
+
+
+Long-Term-Rekey Nonce MAC command
+---------------------------------
+
+When the host wishes to re-key the long-term-key, it first creates a
+nonce and then creates a MAC for the nonce by preparing a Skein
+personalised with the LKMS and keyed with the master key, updating it
+with the nonce, and then finalising it with _Final_Pad.  The first 24
+bits and last 24 bits of the MAC are then PEM encoded and sent to the
+device with this command.
+
+This command is 'M' or 'm', followed by the eight PEM characters (two
+pem quads) which comprise the MAC of the nonce.
+
+The device responds with an acknowledgement (M>).
+
+
+Long-Term re-key command
+------------------------
+
+When the host wishes to re-key the long-term key, it first produces
+and sends the nonce MAC command as above, then it PEM encodes the
+nonce it generated and sends this command to the device.
+
+This command is an 'L' or 'l' followed by the PEM encoded nonce and
+terminated by a '.' to signify the end of the nonce.
+
+The device responds by first verifying the MAC of the nonce, replying
+with an 'l>' packet if the nonce MAC does not match.  If the nonce MAC
+matches then the device responds with an 'L!' packet (see above) and
+subsequently recalculates the long-term key and commits it to
+non-volatile storage.
+
+The Long-term key is derived by taking a Skein personalised with the
+LRS, keyed with the master key, updating it with the entropy from the
+device and then the nonce from the host, and then finalising it to
+produce the 256 bit long-term key.
+

@@ -1,0 +1,71 @@
+Entropy Key - EGD -> Linux Daemon
+=================================
+
+In today's world of virtualised and "cloud" computing, entropy becomes
+more and more difficult to get to the virtual hosts which need it the
+most.  With advancements in attack techniques; along with the
+associated security enhancements inherent in operating systems; the
+need for more entropy on even the simplest of hosts is increased.
+Modern GNU/Linux distributions typically consume 64 bits of random
+data on every process-start.  If a webserver is using CGIs and those
+CGIs could be considered attack vectors against the host, then it is
+of important that the random data used to secure the process is of the
+highest quality.
+
+The Entropy Key daemon (ekeyd) can present entropy on TCP sockets
+using a protocol originally written for the 'Entropy Gathering Daemon'
+(EGD) which has become somewhat of an unofficial standard.  The
+egd-linux daemon provided with the Entropy Key software allows any
+host to connect to the ekeyd and request entropy which it can then use
+to re-stock its local random pool.  Since this is possible from any
+host which can establish a TCP stream to the ekeyd's listening socket,
+this can be used to provide entropy to virtual hosts.
+
+To use the egd-linux daemon to acquire entropy from an ekeyd instance,
+first the ekeyd must be configured to provide the EGD interface.  To
+do this, disable any other output mode (e.g. SetOutputToKernel()) and
+create an EGDTCPSocket which is accessible externally.
+
+e.g.
+
+EGDTCPSocket(8888, "0.0.0.0")
+
+to bind to port 8888 on all interfaces.
+
+Then restart the ekeyd and verify with ekeydctl that all the Entropy
+Key devices have been added to the daemon properly.
+
+Each host which will run egd-linux will first need its random pool
+configuring so that its "low watermark" is high enough that it will
+trip egd-linux into filling it up.  Typically hosts which have
+insufficient incoming entropy will sit around 180 bits of entropy in
+the pool.  We would recommend that you set the low watermark to 1024
+bits, to ensure there is always a good slush of bits available if the
+ekeyd is too busy to service the demand immediately.
+
+To configure this, run:
+
+  sysctl kernel.random.write_wakeup_threshold=1024
+
+as root.
+
+Next, start the egd-linux daemon on the host running ekeyd.  The
+easiest way to do this is simply:
+
+  egd-linux -D/var/run/egd-linux.pid
+
+This will start egd-linux, it will attempt to connect to localhost on
+port 8888, and then feed entropy from the ekeyd to the kernel pool.
+If there is at least 1024 bits in the pool then egd-linux will wait,
+consuming no entropy from the ekeyd.  This behaviour lends itself to
+multiple egd-linux instances talking to a single ekeyd.  Indeed a
+single Entropy Key can supply enough entropy to keep a small network
+of desktop computers and a small office server fully stocked.
+
+Each other host (virtual or otherwise) which requires entropy will
+need to be told where the ekeyd can be found:
+
+  egd-linux -H10.19.3.101 -D/var/run/egd-linux.pid
+
+If you run egd-linux with the '-h' argument then it will display usage
+information.

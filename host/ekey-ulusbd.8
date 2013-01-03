@@ -1,0 +1,61 @@
+.TH ekey-ulusbd 8 "12 Aug 2009"
+.SH NAME
+ekey-ulusbd - Entropy Key, Userland USB Daemon
+.SH SYNOPSIS
+.B ekeyd
+\-b \fIbusnum\fR
+\-d \fIbusnum\fR
+\-p \fIsocketpath\fR
+[ \-P \fIpidfile\fR ]
+[ \-D ]
+[ \-v ]
+[ \-h ]
+.SH DESCRIPTION
+.PP
+.I ekey-ulusbd
+is a daemon which connects to a Simtec Entropy Key device and provides a UNIX domain socket at \fIsocketpath\fR for the ekeyd(8) to connect to.
+.SH OPTIONS
+.TP
+\fB\-b\fR \fIbusnum\fR
+Specify the bus number that the device is on (e.g. \fB003\fR).
+.TP
+\fB\-d\fR \fIdevnum\fR
+Specify the dev number of the device (e.g. \fB005\fR).
+.TP
+\fB\-p\fR \fIsocketpath\fR
+Specify the path to the UNIX domain socket to be created.
+.TP
+\fB\-P\fR \fIpidfile\fR
+Specify the name and path of the file used to record the \fBekeyd\fR process ID.
+.TP
+\fB\-D\fR
+Daemonise rather than remaining attached to the terminal it is run from.
+.TP
+.B \-h
+Print the usage text and exit.
+.TP
+.B \-v
+Print the version number and exit.
+.SH "SEE ALSO"
+ekeyd(8) ekeyd.conf(5), ekey-rekey(8), ekey-setkey(8)
+.SH AUTHOR
+Copyright \(co 2009 Simtec Electronics.
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy 
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights 
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+copies of the Software, and to permit persons to whom the Software is 
+furnished to do so, subject to the following conditions: 
+ 
+The above copyright notice and this permission notice shall be included in 
+all copies or substantial portions of the Software. 
+ 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+THE SOFTWARE. 
