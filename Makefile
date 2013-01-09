@@ -41,3 +41,14 @@ install:
 	done
 	install -D -m 755 munin/ekeyd_stat_ $(DESTDIR)/$(MUNINPLUGINS)/ekeyd_stat_
 	install -D -m 644 munin/plugin-conf.d_ekeyd $(DESTDIR)/${MUNINPLUGINSCONF}/ekeyd
+
+install-BSDInstall:
+	${MAKE} -C host BUILD_ULUSB=$(BUILD_ULUSBD) BUILD_EGDLINUX=$(BUILD_EGDLINUX) DESTDIR=${DESTDIR} install
+	install -d $(DESTDIR)/$(DOCPREFIX)/
+	for DOC in $(DOCFILES); do \
+	  install -m 644 doc/$$DOC $(DESTDIR)/$(DOCPREFIX)/$$DOC ; \
+	done
+	install -d $(DESTDIR)/$(MUNINPLUGINS)/
+	install -m 755 munin/ekeyd_stat_ $(DESTDIR)/$(MUNINPLUGINS)/ekeyd_stat_
+	install -d $(DESTDIR)/${MUNINPLUGINSCONF}/
+	install -m 644 munin/plugin-conf.d_ekeyd $(DESTDIR)/${MUNINPLUGINSCONF}/ekeyd
