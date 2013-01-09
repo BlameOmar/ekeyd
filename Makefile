@@ -10,9 +10,9 @@
 # Ensure they are overridden during both build and install.
 DESTDIR ?=
 PREFIX ?= /usr
-DOCPREFIX=${PREFIX}/share/doc/ekeyd
-MUNINPLUGINS=${PREFIX}/share/munin/plugins
-MUNINPLUGINSCONF=/etc/munin/plugin-conf.d
+DOCPREFIX ?= ${PREFIX}/share/doc/ekeyd
+MUNINPLUGINS ?= ${PREFIX}/share/munin/plugins
+MUNINPLUGINSCONF ?= /etc/munin/plugin-conf.d
 
 #optional daemons
 BUILD_ULUSBD ?= no
