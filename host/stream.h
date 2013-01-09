@@ -10,6 +10,8 @@
 #ifndef DAEMON_STREAM_H
 #define DAEMON_STREAM_H
 
+#include <unistd.h>
+
 typedef ssize_t (estream_read_fn)(int fd, void *buf, size_t count);
 typedef ssize_t (estream_write_fn)(int fd, const void *buf, size_t count);
 

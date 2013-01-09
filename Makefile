@@ -6,7 +6,7 @@
 #
 # For licence terms refer to the COPYING file.
 
-# Override any of these on the cmdline to set options. 
+# Override any of these on the cmdline to set options.
 # Ensure they are overridden during both build and install.
 DESTDIR ?=
 PREFIX ?= /usr
@@ -29,13 +29,13 @@ endif
 all: host
 
 host:
-	${MAKE} -C host BUILD_ULUSB=${BUILD_ULUSBD} BUILD_EGDLINUX=${BUILD_EGDLINUX} DESTDIR=$(DESTDIR} 
+	${MAKE} -C host BUILD_ULUSB=${BUILD_ULUSBD} BUILD_EGDLINUX=${BUILD_EGDLINUX} DESTDIR=${DESTDIR}
 
 clean:
-	${MAKE} -C host BUILD_ULUSB=${BUILD_ULUSBD} BUILD_EGDLINUX=${BUILD_EGDLINUX} DESTDIR=$(DESTDIR}  clean
+	${MAKE} -C host BUILD_ULUSB=${BUILD_ULUSBD} BUILD_EGDLINUX=${BUILD_EGDLINUX} DESTDIR=${DESTDIR}  clean
 
 install:
-	${MAKE} -C host BUILD_ULUSB=$(BUILD_ULUSBD) BUILD_EGDLINUX=$(BUILD_EGDLINUX) DESTDIR=$(DESTDIR) install
+	${MAKE} -C host BUILD_ULUSB=$(BUILD_ULUSBD) BUILD_EGDLINUX=$(BUILD_EGDLINUX) DESTDIR=${DESTDIR} install
 	for DOC in $(DOCFILES) ; do \
 	  install -D -m 644 doc/$$DOC $(DESTDIR)/$(DOCPREFIX)/$$DOC ; \
 	done
